@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	xmltree "github.com/beevik/etree"
 	"github.com/rsto/xmltest"
 	log "github.com/sirupsen/logrus"
 )
@@ -64,8 +63,8 @@ func TestStopResource(t *testing.T) {
 
 	for _, c := range cases {
 		var cib CIB
-		cib.Doc = xmltree.NewDocument()
-		err := cib.Doc.ReadFromString(c.input)
+		listCommand = crmCommand{"echo", []string{c.input}}
+		err := cib.ReadConfiguration()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,11 +137,7 @@ func TestDissolveConstraints(t *testing.T) {
 	</lrm_resources></lrm></node_state>
 </status></cib>`
 
-	docRoot := xmltree.NewDocument()
-	err := docRoot.ReadFromString(xml)
-	if err != nil {
-		t.Fatalf("Invalid XML in test data: %v", err)
-	}
+	listCommand = crmCommand{"echo", []string{xml}}
 
 	cases := []struct {
 		desc      string
@@ -203,14 +198,16 @@ func TestDissolveConstraints(t *testing.T) {
 
 	for _, c := range cases {
 		var cib CIB
+		err := cib.ReadConfiguration()
+		if err != nil {
+			t.Fatal(err)
+		}
 		// store normalized version of expected XML
 		var buf bytes.Buffer
 		if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
 			t.Fatal(err)
 		}
 		normExpect := buf.String()
-
-		cib.Doc = docRoot.Copy()
 
 		cib.DissolveConstraints(c.resources)
 
@@ -260,9 +257,9 @@ func TestFindLrmState(t *testing.T) {
 		</lrm_resource>
 	</lrm_resources></lrm></node_state>
 </status></cib>`
+	listCommand = crmCommand{"echo", []string{xml}}
 	var cib CIB
-	cib.Doc = xmltree.NewDocument()
-	err := cib.Doc.ReadFromString(xml)
+	err := cib.ReadConfiguration()
 	if err != nil {
 		t.Fatalf("Invalid XML in test data: %v", err)
 	}
