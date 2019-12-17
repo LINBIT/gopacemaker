@@ -68,6 +68,12 @@ const (
 	cibTagLrmRscOp   = "lrm_rsc_op"
 )
 
+type ClusterProperty string
+
+const (
+	StonithEnabled ClusterProperty = "cib-bootstrap-options-stonith-enabled"
+)
+
 // LrmRunState represents the state of a CRM resource.
 type LrmRunState int
 
@@ -118,6 +124,38 @@ func (c *CIB) CreateResource(xml string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *CIB) SetStonithEnabled(value bool) error {
+	return c.setClusterProperty(StonithEnabled, strconv.FormatBool(value))
+}
+
+func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	cps := c.Doc.FindElement("/cib/configuration/crm_config/cluster_property_set[@id='cib-bootstrap-options']")
+	if cps == nil {
+		return fmt.Errorf("could not find cluster property set")
+	}
+	id := string(prop)
+	elem := cps.FindElement("nvpair[@id='" + id + "']")
+	if elem == nil {
+		elem = cps.CreateElement(cibTagNvPair)
+		elem.CreateAttr(cibAttrKeyID, id)
+		name := id[len("cib-bootstrap-options-"):]
+		elem.CreateAttr(cibAttrKeyName, name)
+	}
+
+	elem.CreateAttr(cibAttrKeyValue, value)
+
+	err = c.Update()
+	if err != nil {
+		return fmt.Errorf("could not update CIB: %w", err)
+	}
 	return nil
 }
 
