@@ -415,3 +415,84 @@ func TestWaitForResourcesStop(t *testing.T) {
 		}
 	}
 }
+
+func TestSetClusterProperty(t *testing.T) {
+	cases := []struct {
+		desc        string
+		input       string
+		expect      string
+		expectError bool
+	}{{
+		desc: "nvpair does not exist yet",
+		input: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+	}, {
+		desc: "nvpair exists",
+		input: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="true"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+	}, {
+		desc:        "cps does not exist",
+		input:       `<cib><configuration><crm_config></crm_config></configuration></cib>`,
+		expectError: true,
+	}}
+
+	n := xmltest.Normalizer{OmitWhitespace: true}
+	for _, c := range cases {
+		var cib CIB
+		listCommand = &testCommand{
+			func(_ string) (string, string, error) {
+				return c.input, "", nil
+			},
+		}
+
+		updateCommand = &testCommand{
+			func(actual string) (string, string, error) {
+				var buf bytes.Buffer
+				if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
+					t.Fatal(err)
+				}
+				normExpect := buf.String()
+				buf.Reset()
+				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
+					t.Fatal(err)
+				}
+				normActual := buf.String()
+
+				if normActual != normExpect {
+					t.Errorf("XML does not match (input '%s')", c.desc)
+					t.Errorf("Expected: %s", normExpect)
+					t.Errorf("Actual: %s", normActual)
+				}
+				return "", "", nil
+			},
+		}
+
+		err := cib.setClusterProperty(StonithEnabled, "false")
+		if err != nil {
+			if !c.expectError {
+				t.Error("Unexpected error: ", err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
+		}
+	}
+}
