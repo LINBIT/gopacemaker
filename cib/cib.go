@@ -16,10 +16,10 @@ type CIB struct {
 }
 
 // Maximum number of CIB poll retries when waiting for CRM resources to stop
-const maxWaitStopRetries = 10
+var maxWaitStopRetries = 10
 
 // Delay between CIB polls in milliseconds
-const cibPollRetryDelay = 2000
+var cibPollRetryDelay = 2000 * time.Millisecond
 
 var (
 	ErrCibFailed = errors.New("Failed to read the CRM configuration. Maybe the cluster is not started on this node?")
@@ -94,7 +94,7 @@ func (l LrmRunState) MarshalJSON() ([]byte, error) { return json.Marshal(l.Strin
 
 // ReadConfiguration calls the crm list command and parses the XML data it returns.
 func (c *CIB) ReadConfiguration() error {
-	stdout, _, err := execute("", listCommand.executable, listCommand.arguments...)
+	stdout, _, err := listCommand.execute("")
 	if err != nil {
 		// TODO maybe we can benefit from error wrapping here, but for
 		// now this is good enough
@@ -113,7 +113,7 @@ func (c *CIB) ReadConfiguration() error {
 
 func (c *CIB) CreateResource(xml string) error {
 	// Call cibadmin and pipe the CIB update data to the cluster resource manager
-	_, _, err := execute(xml, createCommand.executable, createCommand.arguments...)
+	_, _, err := createCommand.execute(xml)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (c *CIB) StopResource(id string) error {
 // to start it.
 func (c *CIB) modifyTargetRole(id string, startFlag bool) error {
 	// Process the CIB XML document tree and insert meta attributes for target-role=Stopped
-	rscElem := c.Doc.FindElement("/cib/configuration/resources/primitive[@id='" + id + "']")
+	rscElem := c.FindResource(id)
 	if rscElem == nil {
 		return errors.New("CRM resource not found in the CIB, cannot modify role.")
 	}
@@ -196,7 +196,7 @@ func (c *CIB) WaitForResourcesStop(idsToStop []string) (bool, error) {
 	}
 
 	for _, id := range idsToStop {
-		if c.FindResource(id) != nil {
+		if c.FindResource(id) == nil {
 			log.WithFields(log.Fields{
 				"resource": id,
 			}).Warning("Resource not found in the CIB, will be ignored.")
@@ -234,7 +234,7 @@ func (c *CIB) WaitForResourcesStop(idsToStop []string) (bool, error) {
 			break
 		}
 
-		time.Sleep(time.Duration(cibPollRetryDelay * time.Millisecond))
+		time.Sleep(cibPollRetryDelay)
 
 		// Re-read the current CIB XML
 		err = c.ReadConfiguration()
@@ -289,7 +289,7 @@ func (c *CIB) Update() error {
 	}
 
 	// Call cibadmin and pipe the CIB update data to the cluster resource manager
-	_, _, err = execute(cibData, updateCommand.executable, updateCommand.arguments...)
+	_, _, err = updateCommand.execute(cibData)
 	if err != nil {
 		log.Warn("CRM command execution returned an error")
 		log.Trace("The updated CIB data sent to the command was:")

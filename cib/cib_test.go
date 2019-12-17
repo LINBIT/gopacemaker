@@ -4,10 +4,21 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rsto/xmltest"
 	log "github.com/sirupsen/logrus"
 )
+
+type commandHook func(string) (string, string, error)
+
+type testCommand struct {
+	hook commandHook
+}
+
+func (c *testCommand) execute(stdin string) (string, string, error) {
+	return c.hook(stdin)
+}
 
 func TestStopResource(t *testing.T) {
 	expect := `<cib><configuration><resources>
@@ -63,7 +74,29 @@ func TestStopResource(t *testing.T) {
 
 	for _, c := range cases {
 		var cib CIB
-		listCommand = crmCommand{"echo", []string{c.input}}
+		listCommand = &testCommand{
+			func(_ string) (string, string, error) {
+				return c.input, "", nil
+			},
+		}
+
+		updateCommand = &testCommand{
+			func(actual string) (string, string, error) {
+				var buf bytes.Buffer
+				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
+					t.Fatal(err)
+				}
+				normActual := buf.String()
+
+				if normActual != normExpect {
+					t.Errorf("XML does not match (input '%s')", c.desc)
+					t.Errorf("Expected: %s", normExpect)
+					t.Errorf("Actual: %s", normActual)
+				}
+				return "", "", nil
+			},
+		}
+
 		err := cib.ReadConfiguration()
 		if err != nil {
 			t.Fatal(err)
@@ -82,21 +115,9 @@ func TestStopResource(t *testing.T) {
 			continue
 		}
 
-		actual, err := cib.Doc.WriteToString()
+		err = cib.Update()
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		var buf bytes.Buffer
-		if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
-			t.Fatal(err)
-		}
-		normActual := buf.String()
-
-		if normActual != normExpect {
-			t.Errorf("XML does not match (input '%s')", c.desc)
-			t.Errorf("Expected: %s", normExpect)
-			t.Errorf("Actual: %s", normActual)
 		}
 	}
 }
@@ -136,8 +157,11 @@ func TestDissolveConstraints(t *testing.T) {
 		<lrm_resource id="p_punblock_example" type="portblock" class="ocf" provider="heartbeat"/>
 	</lrm_resources></lrm></node_state>
 </status></cib>`
-
-	listCommand = crmCommand{"echo", []string{xml}}
+	listCommand = &testCommand{
+		func(_ string) (string, string, error) {
+			return xml, "", nil
+		},
+	}
 
 	cases := []struct {
 		desc      string
@@ -198,34 +222,39 @@ func TestDissolveConstraints(t *testing.T) {
 
 	for _, c := range cases {
 		var cib CIB
+
+		updateCommand = &testCommand{
+			func(actual string) (string, string, error) {
+				// store normalized version of expected XML
+				var buf bytes.Buffer
+				if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
+					t.Fatal(err)
+				}
+				normExpect := buf.String()
+				buf.Reset()
+				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
+					t.Fatal(err)
+				}
+				normActual := buf.String()
+
+				if normActual != normExpect {
+					t.Errorf("XML does not match (input '%s')", c.desc)
+					t.Errorf("Expected: %s", normExpect)
+					t.Errorf("Actual: %s", normActual)
+				}
+
+				return "", "", nil
+			},
+		}
+
 		err := cib.ReadConfiguration()
 		if err != nil {
 			t.Fatal(err)
 		}
-		// store normalized version of expected XML
-		var buf bytes.Buffer
-		if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
-			t.Fatal(err)
-		}
-		normExpect := buf.String()
-
 		cib.DissolveConstraints(c.resources)
-
-		actual, err := cib.Doc.WriteToString()
+		err = cib.Update()
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		buf.Reset()
-		if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
-			t.Fatal(err)
-		}
-		normActual := buf.String()
-
-		if normActual != normExpect {
-			t.Errorf("XML does not match (input '%s')", c.desc)
-			t.Errorf("Expected: %s", normExpect)
-			t.Errorf("Actual: %s", normActual)
 		}
 	}
 }
@@ -257,7 +286,7 @@ func TestFindLrmState(t *testing.T) {
 		</lrm_resource>
 	</lrm_resources></lrm></node_state>
 </status></cib>`
-	listCommand = crmCommand{"echo", []string{xml}}
+	listCommand = &crmCommand{"echo", []string{xml}}
 	var cib CIB
 	err := cib.ReadConfiguration()
 	if err != nil {
@@ -315,6 +344,74 @@ func TestFindLrmState(t *testing.T) {
 			t.Errorf("State does not match for case %s", c.desc)
 			t.Errorf("Expected: %v", c.expect)
 			t.Errorf("Actual: %v", actual)
+		}
+	}
+}
+
+func TestWaitForResourcesStop(t *testing.T) {
+	cases := []struct {
+		desc          string
+		resources     []string
+		list          commandHook
+		expectStopped bool
+		expectError   bool
+	}{{
+		desc:      "normal case: all resources stopped on the first iteration",
+		resources: []string{"p_iscsi_example"},
+		list: func(_ string) (string, string, error) {
+			xml := `<cib><configuration><resources>
+				<primitive id="p_iscsi_example"></primitive>
+			</resources></configuration>
+			<status>
+				<node_state><lrm id="171"><lrm_resources>
+					<lrm_resource id="p_iscsi_example">
+					<lrm_rsc_op operation="stop" rc-code="0"/>
+				</lrm_resource></lrm_resources></lrm></node_state>
+			</status></cib>`
+			return xml, "", nil
+		},
+		expectStopped: true,
+		expectError:   false,
+	}, {
+		desc:      "resource not stopped, timeout",
+		resources: []string{"p_iscsi_example"},
+		list: func(_ string) (string, string, error) {
+			xml := `<cib><configuration><resources>
+				<primitive id="p_iscsi_example"></primitive>
+			</resources></configuration>
+			<status>
+				<node_state><lrm id="171"><lrm_resources>
+					<lrm_resource id="p_iscsi_example">
+					<lrm_rsc_op operation="start" rc-code="0"/>
+				</lrm_resource></lrm_resources></lrm></node_state>
+			</status></cib>`
+			return xml, "", nil
+		},
+		expectStopped: false,
+		expectError:   false,
+	}}
+
+	// speed it up by waiting only for 1ms
+	cibPollRetryDelay = 1 * time.Millisecond
+
+	for _, c := range cases {
+		var cib CIB
+		listCommand = &testCommand{c.list}
+		stopped, err := cib.WaitForResourcesStop(c.resources)
+		if err != nil {
+			if !c.expectError {
+				t.Error("Unexpected error: ", err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
+		}
+
+		if c.expectStopped != stopped {
+			t.Errorf("Expected stopped to be %t, was %t", c.expectStopped, stopped)
 		}
 	}
 }
