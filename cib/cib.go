@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -348,6 +349,10 @@ func (c *CIB) Update() error {
 		log.Warn("CRM command execution returned an error")
 		log.Trace("The updated CIB data sent to the command was:")
 		log.Trace(cibData)
+	}
+
+	if e, ok := err.(*exec.ExitError); ok {
+		return fmt.Errorf("exit code %d:\n%s", e.ExitCode, string(e.Stderr))
 	}
 
 	return err
