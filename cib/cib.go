@@ -137,9 +137,25 @@ func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 		return fmt.Errorf("could not read configuration: %w", err)
 	}
 
-	cps := c.Doc.FindElement("/cib/configuration/crm_config/cluster_property_set[@id='cib-bootstrap-options']")
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	configuration := root.FindElement("configuration")
+	if configuration == nil {
+		configuration = root.CreateElement("configuration")
+	}
+
+	crmConfig := configuration.FindElement("crm_config")
+	if crmConfig == nil {
+		crmConfig = configuration.CreateElement("crm_config")
+	}
+
+	cps := crmConfig.FindElement("cluster_property_set[@id='cib-bootstrap-options']")
 	if cps == nil {
-		return fmt.Errorf("could not find cluster property set")
+		cps = crmConfig.CreateElement("cluster_property_set")
+		cps.CreateAttr("id", "cib-bootstrap-options")
 	}
 	id := string(prop)
 	elem := cps.FindElement("nvpair[@id='" + id + "']")

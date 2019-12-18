@@ -446,9 +446,30 @@ func TestSetClusterProperty(t *testing.T) {
 			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
 		</cluster_property_set></crm_config></configuration></cib>`,
 	}, {
-		desc:        "cps does not exist",
-		input:       `<cib><configuration><crm_config></crm_config></configuration></cib>`,
+		desc:        "cib does not exist",
+		input:       ``,
 		expectError: true,
+	}, {
+		desc:  "configuration does not exist",
+		input: `<cib></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+	}, {
+		desc:  "crm_config does not exist",
+		input: `<cib><configuration></configuration></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
+	}, {
+		desc:  "cps does not exist",
+		input: `<cib><configuration><crm_config></crm_config></configuration></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+		</cluster_property_set></crm_config></configuration></cib>`,
 	}}
 
 	n := xmltest.Normalizer{OmitWhitespace: true}
