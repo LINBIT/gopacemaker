@@ -197,6 +197,49 @@ func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 	return nil
 }
 
+// StandbyNode sets a pacemaker node into standby
+func (c *CIB) StandbyNode(nodeUname string) error {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	nodesElem := root.FindElement("nodes")
+	if root == nil {
+		return fmt.Errorf("nodes element node found.")
+	}
+
+	node := nodesElem.FindElement("node[@uname='" + nodeUname + "']")
+	if node == nil {
+		return fmt.Errorf("node %s not found", nodeUname)
+	}
+
+	standbyAttr, err := GetNvPairValue(node, "standby")
+	if err != nil {
+		instanceAttrElem := node.FindElement("instance_attributes")
+		if instanceAttrElem == nil {
+			instanceAttrElem = node.CreateElement("instance_attributes")
+		}
+
+		standbyNvPair := instanceAttrElem.CreateElement("nvpair")
+		standbyNvPair.CreateAttr("name", "standby")
+		standbyNvPair.CreateAttr("value", "on")
+	} else {
+		standbyAttr.Value = "on"
+	}
+
+	err = c.Update()
+	if err != nil {
+		return fmt.Errorf("could not update CIB: %w", err)
+	}
+	return nil
+}
+
 func (c *CIB) StartResource(id string) error {
 	return c.modifyTargetRole(id, true)
 }

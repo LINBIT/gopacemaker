@@ -20,6 +20,15 @@ func (c *testCommand) execute(stdin string) (string, string, error) {
 	return c.hook(stdin)
 }
 
+func normalizeXML(t *testing.T, xml string) string {
+	n := xmltest.Normalizer{OmitWhitespace: true}
+	var buf bytes.Buffer
+	if err := n.Normalize(&buf, strings.NewReader(xml)); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
 func TestStopResource(t *testing.T) {
 	expect := `<cib><configuration><resources>
 			<primitive id="p_iscsi_example">
@@ -577,6 +586,86 @@ func TestFindNodeState(t *testing.T) {
 			t.Errorf("State does not match for case \"%s\"", c.desc)
 			t.Errorf("Expected: %+v", c.expect)
 			t.Errorf("Actual: %+v", actual)
+		}
+	}
+}
+
+func TestNodeStandby(t *testing.T) {
+	cases := []struct {
+		desc        string
+		input       string
+		expect      string
+		expectError bool
+	}{{
+		desc: "set standby la1",
+		input: `<cib><configuration><crm_config>
+			<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+			<nvpair id="cib-bootstrap-options-have-watchdog" name="have-watchdog" value="false"/>
+			<nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="2.0.2.linbit-3.0.el8-744a30d655"/>
+			<nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			</cluster_property_set>
+		</crm_config></configuration>
+		<nodes>
+			<node id="1" uname="la1"/>
+			<node id="3" uname="la2"/>
+			<node id="2" uname="la3"/>
+		</nodes></cib>`,
+		expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+			<nvpair id="cib-bootstrap-options-have-watchdog" name="have-watchdog" value="false"/>
+			<nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="2.0.2.linbit-3.0.el8-744a30d655"/>
+			<nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			</cluster_property_set>
+		</crm_config></configuration>
+		<nodes>
+			<node id="1" uname="la1">
+				<instance_attributes id="nodes-1">
+				    <nvpair id="nodes-1-standby" name="standby" value="on"/>
+                </instance_attributes>
+			</node>
+			<node id="3" uname="la2"/>
+			<node id="2" uname="la3"/>
+		</nodes></cib>`,
+	}}
+
+	for _, c := range cases {
+		var cib CIB
+		listCommand = &testCommand{
+			func(_ string) (string, string, error) {
+				return c.input, "", nil
+			},
+		}
+
+		updateCommand = &testCommand{
+			func(actual string) (string, string, error) {
+				normExpect := normalizeXML(t, c.expect)
+				normActual := normalizeXML(t, actual)
+
+				if normActual != normExpect {
+					t.Errorf("XML does not match (input '%s')", c.desc)
+					t.Errorf("Expected: %s", normExpect)
+					t.Errorf("Actual: %s", normActual)
+				}
+				return "", "", nil
+			},
+		}
+
+		err := cib.StandbyNode("la1")
+
+		if err != nil {
+			if !c.expectError {
+				t.Error("Unexpected error: ", err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
 		}
 	}
 }
