@@ -352,7 +352,7 @@ func (c *CIB) Update() error {
 	}
 
 	if e, ok := err.(*exec.ExitError); ok {
-		return fmt.Errorf("exit code %d:\n%s", e.ExitCode, string(e.Stderr))
+		return fmt.Errorf("exit code %d:\n%s", e.ExitCode(), string(e.Stderr))
 	}
 
 	return err
