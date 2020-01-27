@@ -197,6 +197,102 @@ func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 	return nil
 }
 
+func findNode(root *xmltree.Element, nodeUname string) (*xmltree.Element, error) {
+	configurationElem := root.FindElement("configuration")
+	if configurationElem == nil {
+		return nil, fmt.Errorf("configuration element not found within <cib>")
+	}
+
+	nodesElem := configurationElem.FindElement("nodes")
+	if nodesElem == nil {
+		return nil, fmt.Errorf("nodes element not found within <configuration>")
+	}
+
+	node := nodesElem.FindElement("node[@uname='" + nodeUname + "']")
+	if node == nil {
+		return nil, fmt.Errorf("node %s not found", nodeUname)
+	}
+
+	return node, nil
+}
+
+// StandbyNode sets a pacemaker node into standby
+func (c *CIB) StandbyNode(nodeUname string) error {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	node, err := findNode(root, nodeUname)
+	if err != nil {
+		return err
+	}
+
+	nodeID := node.SelectAttr("id")
+	if nodeID == nil {
+		return fmt.Errorf("node doesn't have id attribue")
+	}
+
+	standbyAttr, err := GetNvPairValue(node, "standby")
+	if err != nil {
+		instanceAttrElem := node.FindElement("instance_attributes")
+		if instanceAttrElem == nil {
+			instanceAttrElem = node.CreateElement("instance_attributes")
+			instanceAttrElem.CreateAttr("id", "nodes-"+nodeID.Value)
+		}
+
+		standbyNvPair := instanceAttrElem.CreateElement("nvpair")
+		standbyNvPair.CreateAttr("name", "standby")
+		standbyNvPair.CreateAttr("value", "on")
+		standbyNvPair.CreateAttr("id", "nodes-"+nodeID.Value+"-standby")
+	} else {
+		standbyAttr.Value = "on"
+	}
+
+	err = c.Update()
+	if err != nil {
+		return fmt.Errorf("could not update CIB: %w", err)
+	}
+	return nil
+}
+
+// UnStandbyNode sets a pacemaker node out of standby
+func (c *CIB) UnStandbyNode(nodeUname string) error {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	node, err := findNode(root, nodeUname)
+	if err != nil {
+		return err
+	}
+
+	instanceAttrElem := node.FindElement("instance_attributes")
+
+	if instanceAttrElem != nil {
+		standbyNVPair := instanceAttrElem.FindElement("nvpair[@name='standby']")
+		instanceAttrElem.RemoveChild(standbyNVPair)
+	}
+	// else no standby set, we are good
+
+	err = c.Update()
+	if err != nil {
+		return fmt.Errorf("could not update CIB: %w", err)
+	}
+	return nil
+}
+
 func (c *CIB) StartResource(id string) error {
 	return c.modifyTargetRole(id, true)
 }
