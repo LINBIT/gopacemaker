@@ -75,6 +75,22 @@ const (
 	StonithEnabled ClusterProperty = "cib-bootstrap-options-stonith-enabled"
 )
 
+type joinState string
+
+const (
+	JoinDown    joinState = "down"
+	JoinPending joinState = "pending"
+	JoinMember  joinState = "member"
+	JoinBanned  joinState = "banned"
+)
+
+type NodeState struct {
+	InCCM        bool
+	Crmd         bool
+	Join         joinState
+	JoinExpected joinState
+}
+
 // LrmRunState represents the state of a CRM resource.
 type LrmRunState int
 
@@ -182,6 +198,45 @@ func (c *CIB) StartResource(id string) error {
 
 func (c *CIB) StopResource(id string) error {
 	return c.modifyTargetRole(id, false)
+}
+
+func (c *CIB) FindNodeState(uname string) (NodeState, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return NodeState{}, fmt.Errorf("could not read configuration: %w", err)
+	}
+	elem := c.Doc.FindElement("/cib/status/node_state[@uname='" + uname + "']")
+	if elem == nil {
+		return NodeState{}, fmt.Errorf("node not found in CIB: %s", uname)
+	}
+
+	inCCMAttr := elem.SelectAttrValue("in_ccm", "")
+	if inCCMAttr == "" {
+		return NodeState{}, fmt.Errorf("missing attribute 'in_ccm' on state of node %s", uname)
+	}
+
+	crmdAttr := elem.SelectAttrValue("crmd", "")
+	if crmdAttr == "" {
+		return NodeState{}, fmt.Errorf("missing attribute 'crmd' on state of node %s", uname)
+	}
+
+	joinAttr := elem.SelectAttrValue("join", "")
+	if joinAttr == "" {
+		return NodeState{}, fmt.Errorf("missing attribute 'join' on state of node %s", uname)
+	}
+
+	expectedAttr := elem.SelectAttrValue("expected", "")
+	if expectedAttr == "" {
+		return NodeState{}, fmt.Errorf("missing attribute 'expected' on state of node %s", uname)
+	}
+
+	return NodeState{
+		InCCM: inCCMAttr == "true",
+		Crmd:  crmdAttr == "online",
+		// THINK: is there some way to get "type safety" out of these enums?
+		Join:         joinState(joinAttr),
+		JoinExpected: joinState(expectedAttr),
+	}, nil
 }
 
 // ModifyTargetRole sets the target-role of a resource in CRM.

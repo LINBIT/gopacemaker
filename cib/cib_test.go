@@ -517,3 +517,66 @@ func TestSetClusterProperty(t *testing.T) {
 		}
 	}
 }
+
+func TestFindNodeState(t *testing.T) {
+	var cib CIB
+	err := cib.ReadConfiguration()
+	if err != nil {
+		t.Fatalf("Invalid XML in test data: %v", err)
+	}
+
+	cases := []struct {
+		desc        string
+		xml         string
+		expect      NodeState
+		expectError bool
+	}{{
+		desc: "normal case",
+		xml:  `<cib><status><node_state uname="node1" in_ccm="true" crmd="online" join="member" expected="member"></node_state></cib></status>`,
+		expect: NodeState{
+			InCCM:        true,
+			Crmd:         true,
+			Join:         JoinMember,
+			JoinExpected: JoinMember,
+		},
+	}, {
+		desc: "node down",
+		xml:  `<cib><status><node_state uname="node1" in_ccm="false" crmd="offline" join="down" expected="banned"></node_state></cib></status>`,
+		expect: NodeState{
+			InCCM:        false,
+			Crmd:         false,
+			Join:         JoinDown,
+			JoinExpected: JoinBanned,
+		},
+	}, {
+		desc:        "missing attribute",
+		xml:         `<cib><status><node_state uname="node1"></node_state></cib></status>`,
+		expectError: true,
+	}, {
+		desc:        "unknown node",
+		xml:         `<cib><status><node_state uname="some_other_node"></node_state></cib></status>`,
+		expectError: true,
+	}}
+
+	for _, c := range cases {
+		listCommand = &crmCommand{"echo", []string{c.xml}}
+		actual, err := cib.FindNodeState("node1")
+		if err != nil {
+			if !c.expectError {
+				t.Error("Unexpected error: ", err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
+		}
+
+		if actual != c.expect {
+			t.Errorf("State does not match for case \"%s\"", c.desc)
+			t.Errorf("Expected: %+v", c.expect)
+			t.Errorf("Actual: %+v", actual)
+		}
+	}
+}
