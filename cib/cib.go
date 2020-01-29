@@ -84,6 +84,11 @@ const (
 	JoinBanned  joinState = "banned"
 )
 
+type Node struct {
+	HostName string
+	State    NodeState
+}
+
 type NodeState struct {
 	InCCM        bool
 	Crmd         bool
@@ -200,15 +205,8 @@ func (c *CIB) StopResource(id string) error {
 	return c.modifyTargetRole(id, false)
 }
 
-func (c *CIB) FindNodeState(uname string) (NodeState, error) {
-	err := c.ReadConfiguration()
-	if err != nil {
-		return NodeState{}, fmt.Errorf("could not read configuration: %w", err)
-	}
-	elem := c.Doc.FindElement("/cib/status/node_state[@uname='" + uname + "']")
-	if elem == nil {
-		return NodeState{}, fmt.Errorf("node not found in CIB: %s", uname)
-	}
+func parseNodeState(elem *xmltree.Element) (NodeState, error) {
+	uname := elem.SelectAttrValue("uname", "<unknown>")
 
 	inCCMAttr := elem.SelectAttrValue("in_ccm", "")
 	if inCCMAttr == "" {
@@ -237,6 +235,48 @@ func (c *CIB) FindNodeState(uname string) (NodeState, error) {
 		Join:         joinState(joinAttr),
 		JoinExpected: joinState(expectedAttr),
 	}, nil
+}
+
+func (c *CIB) FindNodeState(uname string) (NodeState, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return NodeState{}, fmt.Errorf("could not read configuration: %w", err)
+	}
+	elem := c.Doc.FindElement("/cib/status/node_state[@uname='" + uname + "']")
+	if elem == nil {
+		return NodeState{}, fmt.Errorf("node not found in CIB: %s", uname)
+	}
+
+	return parseNodeState(elem)
+}
+
+func (c *CIB) ListNodes() ([]Node, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return nil, fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	var nodes []Node
+	elems := c.Doc.FindElements("/cib/status/node_state")
+	for i := range elems {
+		elem := elems[i]
+		state, err := parseNodeState(elem)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse node state: %w", err)
+		}
+
+		uname := elem.SelectAttrValue("uname", "")
+		if uname == "" {
+			return nil, fmt.Errorf("missing uname on node element #%d", i)
+		}
+
+		nodes = append(nodes, Node{
+			HostName: uname,
+			State:    state,
+		})
+	}
+
+	return nodes, nil
 }
 
 // ModifyTargetRole sets the target-role of a resource in CRM.
