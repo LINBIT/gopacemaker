@@ -72,14 +72,8 @@ func TestStopResource(t *testing.T) {
 		expectError: true,
 	}}
 
-	n := xmltest.Normalizer{OmitWhitespace: true}
-
 	// store normalized version of expected XML
-	var buf bytes.Buffer
-	if err := n.Normalize(&buf, strings.NewReader(expect)); err != nil {
-		t.Fatal(err)
-	}
-	normExpect := buf.String()
+	normExpect := normalizeXML(t, expect)
 
 	for _, c := range cases {
 		var cib CIB
@@ -91,11 +85,7 @@ func TestStopResource(t *testing.T) {
 
 		updateCommand = &testCommand{
 			func(actual string) (string, string, error) {
-				var buf bytes.Buffer
-				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
-					t.Fatal(err)
-				}
-				normActual := buf.String()
+				normActual := normalizeXML(t, actual)
 
 				if normActual != normExpect {
 					t.Errorf("XML does not match (input '%s')", c.desc)
@@ -227,24 +217,14 @@ func TestDissolveConstraints(t *testing.T) {
 		expect:    `<cib><configuration><constraints></constraints></configuration><status><node_state><lrm id="171"><lrm_resources></lrm_resources></lrm></node_state></status></cib>`,
 	}}
 
-	n := xmltest.Normalizer{OmitWhitespace: true}
-
 	for _, c := range cases {
 		var cib CIB
 
 		updateCommand = &testCommand{
 			func(actual string) (string, string, error) {
 				// store normalized version of expected XML
-				var buf bytes.Buffer
-				if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
-					t.Fatal(err)
-				}
-				normExpect := buf.String()
-				buf.Reset()
-				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
-					t.Fatal(err)
-				}
-				normActual := buf.String()
+				normExpect := normalizeXML(t, c.expect)
+				normActual := normalizeXML(t, actual)
 
 				if normActual != normExpect {
 					t.Errorf("XML does not match (input '%s')", c.desc)
@@ -481,7 +461,6 @@ func TestSetClusterProperty(t *testing.T) {
 		</cluster_property_set></crm_config></configuration></cib>`,
 	}}
 
-	n := xmltest.Normalizer{OmitWhitespace: true}
 	for _, c := range cases {
 		var cib CIB
 		listCommand = &testCommand{
@@ -492,16 +471,8 @@ func TestSetClusterProperty(t *testing.T) {
 
 		updateCommand = &testCommand{
 			func(actual string) (string, string, error) {
-				var buf bytes.Buffer
-				if err := n.Normalize(&buf, strings.NewReader(c.expect)); err != nil {
-					t.Fatal(err)
-				}
-				normExpect := buf.String()
-				buf.Reset()
-				if err := n.Normalize(&buf, strings.NewReader(actual)); err != nil {
-					t.Fatal(err)
-				}
-				normActual := buf.String()
+				normExpect := normalizeXML(t, c.expect)
+				normActual := normalizeXML(t, actual)
 
 				if normActual != normExpect {
 					t.Errorf("XML does not match (input '%s')", c.desc)
