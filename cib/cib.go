@@ -216,6 +216,31 @@ func findNode(root *xmltree.Element, nodeUname string) (*xmltree.Element, error)
 	return node, nil
 }
 
+// IsStandbyNode check if a node is currently set standby
+func (c *CIB) IsStandbyNode(nodeUname string) (bool, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return false, fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return false, fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	node, err := findNode(root, nodeUname)
+	if err != nil {
+		return false, err
+	}
+
+	standbyAttr, err := GetNvPairValue(node, "standby")
+	if err == nil {
+		return standbyAttr.Value == "on", nil
+	}
+
+	return false, nil
+}
+
 // StandbyNode sets a pacemaker node into standby
 func (c *CIB) StandbyNode(nodeUname string) error {
 	err := c.ReadConfiguration()
