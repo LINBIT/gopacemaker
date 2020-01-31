@@ -197,6 +197,37 @@ func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 	return nil
 }
 
+func (c *CIB) GetNodeOfResource(resource string) string {
+	c.ReadConfiguration()
+
+	nodes := c.Doc.FindElements("/cib/status/node_state")
+
+	for _, node := range nodes {
+		uname := node.SelectAttrValue("uname", "")
+		if uname == "" {
+			log.Debug("could not find uname for node, ignoring")
+			continue
+		}
+		contextLog := log.WithFields(log.Fields{
+			"resource": resource,
+			"node":     uname,
+		})
+
+		elem := node.FindElement("lrm/lrm_resources/lrm_resource[@id='" + resource + "']")
+		if elem == nil {
+			contextLog.Debugf("resource not present on node, skipping")
+			continue
+		}
+		runStateOnNode := updateRunState(resource, elem, Unknown)
+		contextLog.Debugf("run state on node: %d", runStateOnNode)
+		if runStateOnNode == Running {
+			return uname
+		}
+	}
+
+	return ""
+}
+
 func findNode(root *xmltree.Element, nodeUname string) (*xmltree.Element, error) {
 	configurationElem := root.FindElement("configuration")
 	if configurationElem == nil {

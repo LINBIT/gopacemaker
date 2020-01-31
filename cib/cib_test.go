@@ -766,3 +766,57 @@ func TestNodeUnStandby(t *testing.T) {
 		}
 	}
 }
+
+func TestGetNodeOfResource(t *testing.T) {
+	var cib CIB
+
+	cases := []struct {
+		desc   string
+		xml    string
+		expect string
+	}{{
+		desc: "successful monitor action, one node",
+		xml: `<cib><status><node_state uname="node1"><lrm>
+			<lrm_resources>
+				<lrm_resource id="p_test">
+					<lrm_rsc_op operation="monitor" rc-code="0" />
+				</lrm_resource>
+			</lrm_resources>
+		</lrm></node_state></status></cib>`,
+		expect: "node1",
+	}, {
+		desc: "successful monitor action, multiple nodes",
+		xml: `<cib><status>
+			<node_state uname="node1"><lrm>
+				<lrm_resources>
+					<lrm_resource id="p_test">
+						<lrm_rsc_op operation="monitor" rc-code="7" />
+					</lrm_resource>
+				</lrm_resources>
+			</lrm></node_state>
+			<node_state uname="node2"><lrm>
+				<lrm_resources>
+					<lrm_resource id="p_test">
+						<lrm_rsc_op operation="monitor" rc-code="0" />
+					</lrm_resource>
+				</lrm_resources>
+			</lrm></node_state>
+			<node_state uname="node3"><lrm>
+				<lrm_resources>
+				</lrm_resources>
+			</lrm></node_state>
+		</status></cib>`,
+		expect: "node2",
+	}}
+
+	for _, c := range cases {
+		listCommand = &crmCommand{"echo", []string{c.xml}}
+		actual := cib.GetNodeOfResource("p_test")
+
+		if actual != c.expect {
+			t.Errorf("State does not match for case \"%s\"", c.desc)
+			t.Errorf("Expected: %+v", c.expect)
+			t.Errorf("Actual: %+v", actual)
+		}
+	}
+}
