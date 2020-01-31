@@ -500,10 +500,6 @@ func TestSetClusterProperty(t *testing.T) {
 
 func TestFindNodeState(t *testing.T) {
 	var cib CIB
-	err := cib.ReadConfiguration()
-	if err != nil {
-		t.Fatalf("Invalid XML in test data: %v", err)
-	}
 
 	cases := []struct {
 		desc        string
