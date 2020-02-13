@@ -893,3 +893,17 @@ func TestGetNodeOfResource(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdate(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Unexpected panic: %s", r)
+		}
+	}()
+
+	var c CIB
+	err := c.Update() // this should not panic
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+}

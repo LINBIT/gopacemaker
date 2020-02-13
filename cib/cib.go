@@ -670,6 +670,12 @@ func (c *CIB) FindLrmState(id string) LrmRunState {
 }
 
 func (c *CIB) Update() error {
+	if c.Doc == nil {
+		// If we don't have a document to serialize, just make this
+		// a no-op. THINK: is this actually a good idea?
+		// I guess we'll keep it this way until somebody complains :)
+		return nil
+	}
 	// Serialize the modified XML document tree into a string containing the XML document (CIB update data)
 	cibData, err := c.Doc.WriteToString()
 	if err != nil {
