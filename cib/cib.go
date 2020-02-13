@@ -153,6 +153,20 @@ func (c *CIB) SetStonithEnabled(value bool) error {
 	return c.setClusterProperty(StonithEnabled, strconv.FormatBool(value))
 }
 
+func (c *CIB) GetStonithEnabled() (bool, error) {
+	str, err := c.getClusterProperty(StonithEnabled)
+	if err != nil {
+		return false, fmt.Errorf("failed to get cluster property: %w", err)
+	}
+
+	ret, err := strconv.ParseBool(str)
+	if err != nil {
+		return false, fmt.Errorf("failed to interpret result as boolean: %w", err)
+	}
+
+	return ret, nil
+}
+
 func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 	err := c.ReadConfiguration()
 	if err != nil {
@@ -195,6 +209,46 @@ func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
 		return fmt.Errorf("could not update CIB: %w", err)
 	}
 	return nil
+}
+
+// getClusterProperty gets the value of a property from the "cib-bootstrap-options"
+// property set. The expected XML hierarchy is:
+//
+//    <cib>
+//      <configuration>
+//        <crm_config>
+//          <cluster_property_set id="cib-bootstrap-options">
+//            <nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+//            ...
+//          </cluster_property_set>
+//        </crm_config>
+//      </configuration>
+//    </cib>
+//
+// If the cib root element does not exist, an error is returned. If the
+// configuration, crm_config, cluster_property_set, or a matching nvpair
+// does not exist, the property is assumed to have no value and an empty string
+// along with a nil error is returned.
+// If the specified property is found, its value is returned as a string.
+func (c *CIB) getClusterProperty(prop ClusterProperty) (string, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return "", fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return "", fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	xpath := fmt.Sprintf("configuration/crm_config/cluster_property_set[@id='cib-bootstrap-options']"+
+		"/nvpair[@id='%s']", prop)
+	nvpair := root.FindElement(xpath)
+	if nvpair == nil {
+		return "", nil
+	}
+
+	return nvpair.SelectAttrValue("value", ""), nil
 }
 
 func (c *CIB) GetNodeOfResource(resource string) string {

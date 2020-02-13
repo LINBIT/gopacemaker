@@ -498,6 +498,79 @@ func TestSetClusterProperty(t *testing.T) {
 	}
 }
 
+func TestGetClusterProperty(t *testing.T) {
+	cases := []struct {
+		desc        string
+		input       string
+		expect      string
+		expectError bool
+	}{{
+		desc:        "<cib> does not exist",
+		input:       `<someotherroot></someotherroot>`,
+		expectError: true,
+	}, {
+		desc:   "<configuration> does not exist",
+		input:  `<cib></cib>`,
+		expect: "",
+	}, {
+		desc:   "<crm_config> does not exist",
+		input:  `<cib><configuration></configuration></cib>`,
+		expect: "",
+	}, {
+		desc:   "cps does not exist",
+		input:  `<cib><configuration><crm_config></crm_config></configuration></cib>`,
+		expect: "",
+	}, {
+		desc: "<nvpair> does not exist",
+		input: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+		</cluster_property_set></crm_config></configuration></cib>`,
+		expect: "",
+	}, {
+		desc: "<nvpair> does not have value",
+		input: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" />
+		</cluster_property_set></crm_config></configuration></cib>`,
+		expect: "",
+	}, {
+		desc: "<nvpair> has value",
+		input: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" value="false" />
+		</cluster_property_set></crm_config></configuration></cib>`,
+		expect: "false",
+	}}
+
+	for _, c := range cases {
+		var cib CIB
+		listCommand = &testCommand{
+			func(_ string) (string, string, error) {
+				return c.input, "", nil
+			},
+		}
+
+		actual, err := cib.getClusterProperty(StonithEnabled)
+		if err != nil {
+			if !c.expectError {
+				t.Error("Unexpected error: ", err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
+		}
+
+		if actual != c.expect {
+			t.Errorf("Return value does not match (input '%s')", c.desc)
+			t.Errorf("Expected: %s", c.expect)
+			t.Errorf("Actual: %s", actual)
+		}
+	}
+}
+
 func TestFindNodeState(t *testing.T) {
 	var cib CIB
 
