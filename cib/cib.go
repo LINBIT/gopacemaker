@@ -260,6 +260,29 @@ func (c *CIB) getClusterProperty(prop ClusterProperty) (string, error) {
 	return nvpair.SelectAttrValue("value", ""), nil
 }
 
+// GetNodeOfResource finds the node on which a resource is currently running.
+// For this, it looks at the node_state element in a hierarchy like this:
+//
+//    <cib>
+//      <status>
+//        <node_state>
+//          <lrm>
+//            <lrm_resources>
+//              <lrm_resource> ... </lrm_resource>
+//            </lrm_resources>
+//          </lrm>
+//        </node_state>
+//      </status>
+//    </cib>
+//
+// It will try to find an <lrm_resource> with an 'id' attribute corresponding
+// to the resource name in question. If this is not found, an empty string is
+// returned, signalling that the resource is not configured or not running on
+// any node.
+//
+// If the corresponding lrm_resource element is found, its run state is examined
+// (see the updateRunState function). If the run state is found to be "Running",
+// the name of the current node is returned.
 func (c *CIB) GetNodeOfResource(resource string) string {
 	c.ReadConfiguration()
 
