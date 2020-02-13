@@ -2,6 +2,7 @@ package cib
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -905,5 +906,27 @@ func TestUpdate(t *testing.T) {
 	err := c.Update() // this should not panic
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
+	}
+}
+
+func TestMarshalLrmRunState(t *testing.T) {
+	// We want to make sure LrmRunState is JSON marshallable
+	j := struct {
+		RunStates []LrmRunState `json:"run_states"`
+	}{
+		[]LrmRunState{Unknown, Running, Stopped},
+	}
+
+	bytes, err := json.Marshal(j)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expect := `{"run_states":["Unknown","Running","Stopped"]}`
+	actual := string(bytes)
+	if string(bytes) != expect {
+		t.Errorf("Unexpected marshalled JSON")
+		t.Errorf("Expected: %s", expect)
+		t.Errorf("Actual: %s", actual)
 	}
 }

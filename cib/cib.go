@@ -1,7 +1,6 @@
 package cib
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -98,28 +97,16 @@ type NodeState struct {
 }
 
 // LrmRunState represents the state of a CRM resource.
-type LrmRunState int
+type LrmRunState string
 
 const (
 	// Unknown means that the resource's state could not be retrieved
-	Unknown LrmRunState = iota
+	Unknown LrmRunState = "Unknown"
 	// Running means that the resource is verified as running
-	Running
+	Running LrmRunState = "Running"
 	// Stopped means that the resource is verfied as stopped
-	Stopped
+	Stopped LrmRunState = "Stopped"
 )
-
-func (l LrmRunState) String() string {
-	switch l {
-	case Running:
-		return "Running"
-	case Stopped:
-		return "Stopped"
-	}
-	return "Unknown"
-}
-
-func (l LrmRunState) MarshalJSON() ([]byte, error) { return json.Marshal(l.String()) }
 
 // ReadConfiguration calls the crm list command and parses the XML data it returns.
 func (c *CIB) ReadConfiguration() error {
@@ -305,7 +292,7 @@ func (c *CIB) GetNodeOfResource(resource string) string {
 			continue
 		}
 		runStateOnNode := updateRunState(resource, elem, Unknown)
-		contextLog.Debugf("run state on node: %d", runStateOnNode)
+		contextLog.Debugf("run state on node: %s", runStateOnNode)
 		if runStateOnNode == Running {
 			return uname
 		}
