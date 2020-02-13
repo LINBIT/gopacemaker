@@ -821,6 +821,6 @@ func getLrmRcCode(entry *xmltree.Element) (int, error) {
 		return 0, errors.New("Found LRM resource operation data without a status code")
 	}
 
-	rc, err := strconv.ParseInt(rcAttr.Value, 10, 16)
+	rc, err := strconv.Atoi(rcAttr.Value)
 	return int(rc), err
 }
