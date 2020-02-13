@@ -22,7 +22,7 @@ var maxWaitStopRetries = 10
 var cibPollRetryDelay = 2000 * time.Millisecond
 
 var (
-	ErrCibFailed = errors.New("Failed to read the CRM configuration. Maybe the cluster is not started on this node?")
+	ErrCibFailed = errors.New("Failed to read the CRM configuration")
 )
 
 // Pacemaker CIB attribute names
@@ -112,10 +112,7 @@ const (
 func (c *CIB) ReadConfiguration() error {
 	stdout, _, err := listCommand.execute("")
 	if err != nil {
-		// TODO maybe we can benefit from error wrapping here, but for
-		// now this is good enough
-		log.Error(err)
-		return ErrCibFailed
+		return fmt.Errorf("%w: %s", ErrCibFailed, err)
 	}
 
 	c.Doc = xmltree.NewDocument()

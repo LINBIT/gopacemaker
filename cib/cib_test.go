@@ -3,6 +3,7 @@ package cib
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -892,6 +893,32 @@ func TestGetNodeOfResource(t *testing.T) {
 			t.Errorf("Expected: %+v", c.expect)
 			t.Errorf("Actual: %+v", actual)
 		}
+	}
+}
+
+func TestReadConfiguration(t *testing.T) {
+	// Test that a failed cibadmin command leads to ErrCibFailed
+	listCommand = &testCommand{
+		func(_ string) (string, string, error) {
+			return "", "", errors.New("oops!")
+		},
+	}
+
+	err := (&CIB{}).ReadConfiguration()
+	if !errors.Is(err, ErrCibFailed) {
+		t.Errorf("Unexpected error: %s, expected ErrCibFailed", err)
+	}
+
+	// Verify that an invalid xml throws an error
+	listCommand = &testCommand{
+		func(_ string) (string, string, error) {
+			return "<this is totally invalid XML!<<<<<", "", nil
+		},
+	}
+
+	err = (&CIB{}).ReadConfiguration()
+	if err == nil {
+		t.Errorf("Expected error, got nil")
 	}
 }
 
