@@ -73,6 +73,7 @@ type ClusterProperty string
 
 const (
 	StonithEnabled ClusterProperty = "cib-bootstrap-options-stonith-enabled"
+	ClusterName    ClusterProperty = "cib-bootstrap-options-cluster-name"
 )
 
 type joinState string
@@ -165,6 +166,14 @@ func (c *CIB) GetStonithEnabled() (bool, error) {
 	}
 
 	return ret, nil
+}
+
+func (c *CIB) SetClusterName(value string) error {
+	return c.setClusterProperty(ClusterName, value)
+}
+
+func (c *CIB) GetClusterName() (string, error) {
+	return c.getClusterProperty(ClusterName)
 }
 
 func (c *CIB) setClusterProperty(prop ClusterProperty, value string) error {
