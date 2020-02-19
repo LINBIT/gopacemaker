@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -923,18 +924,46 @@ func TestReadConfiguration(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestNilDocument(t *testing.T) {
+	listCommand = &testCommand{
+		func(_ string) (string, string, error) {
+			return "", "", nil
+		},
+	}
+
+	updateCommand = &testCommand{
+		func(_ string) (string, string, error) {
+			return "", "", nil
+		},
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Unexpected panic: %s", r)
+			t.Errorf(string(debug.Stack()))
 		}
 	}()
 
-	var c CIB
-	err := c.Update() // this should not panic
-	if err != nil {
-		t.Errorf("Unexpected error: %s", err)
-	}
+	// all public methods should be callable on an empty CIB without panicking
+	(&CIB{}).CreateResource("<test>")
+	(&CIB{}).DissolveConstraints(nil)
+	(&CIB{}).FindLrmState("test")
+	(&CIB{}).FindNodeState("test")
+	(&CIB{}).FindResource("test")
+	(&CIB{}).GetClusterName()
+	(&CIB{}).GetNodeID("test")
+	(&CIB{}).GetNodeOfResource("test")
+	(&CIB{}).GetStonithEnabled()
+	(&CIB{}).IsStandbyNode("test")
+	(&CIB{}).ListNodes()
+	(&CIB{}).ReadConfiguration()
+	(&CIB{}).SetClusterName("test")
+	(&CIB{}).SetStonithEnabled(false)
+	(&CIB{}).StandbyNode("test")
+	(&CIB{}).StartResource("test")
+	(&CIB{}).StopResource("test")
+	(&CIB{}).UnStandbyNode("test")
+	(&CIB{}).Update()
+	(&CIB{}).WaitForResourcesStop(nil)
 }
 
 func TestMarshalLrmRunState(t *testing.T) {

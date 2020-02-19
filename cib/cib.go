@@ -574,6 +574,9 @@ func (c *CIB) modifyTargetRole(id string, startFlag bool) error {
 }
 
 func (c *CIB) FindResource(id string) *xmltree.Element {
+	if c.Doc == nil {
+		return nil
+	}
 	return c.Doc.FindElement("//primitive[@id='" + id + "']")
 }
 
@@ -674,6 +677,9 @@ func GetNvPairValue(elem *xmltree.Element, name string) (*xmltree.Attr, error) {
 
 func (c *CIB) FindLrmState(id string) LrmRunState {
 	state := Unknown
+	if c.Doc == nil {
+		return state
+	}
 	xpath := "cib/status/node_state/lrm/lrm_resources/lrm_resource[@id='" + id + "']"
 	elems := c.Doc.FindElements(xpath)
 	for _, elem := range elems {
