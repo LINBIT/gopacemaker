@@ -957,3 +957,78 @@ func TestMarshalLrmRunState(t *testing.T) {
 		t.Errorf("Actual: %s", actual)
 	}
 }
+
+func TestGetNodeID(t *testing.T) {
+	var cib CIB
+
+	// we are always looking for "dewey"
+	cases := []struct {
+		desc        string
+		xml         string
+		expect      int
+		expectError string
+	}{{
+		desc: "3 nodes",
+		xml: `<cib><configuration><nodes>
+			<node id="1" uname="huey" />
+			<node id="2" uname="dewey" />
+			<node id="3" uname="louie" />
+		</nodes></configuration></cib>`,
+		expect: 2,
+	}, {
+		desc: "not found",
+		xml: `<cib><configuration><nodes>
+			<node id="1" uname="huey" />
+			<node id="3" uname="louie" />
+		</nodes></configuration></cib>`,
+		expectError: "could not find node: node dewey not found",
+	}, {
+		desc: "no node id",
+		xml: `<cib><configuration><nodes>
+			<node id="1" uname="huey" />
+			<node uname="dewey" />
+			<node id="3" uname="louie" />
+		</nodes></configuration></cib>`,
+		expectError: "node doesn't have id attribute",
+	}, {
+		desc: "not a number",
+		xml: `<cib><configuration><nodes>
+			<node id="1" uname="huey" />
+			<node id="definitelynotavalidid" uname="dewey" />
+			<node id="3" uname="louie" />
+		</nodes></configuration></cib>`,
+		expectError: "could not convert node ID 'definitelynotavalidid' to number: strconv.Atoi: parsing \"definitelynotavalidid\": invalid syntax",
+	}, {
+		desc:        "invalid configuration",
+		xml:         `<<<<this is> >> not! xml`,
+		expectError: "could not read configuration: XML syntax error on line 1: expected element name after <",
+	}, {
+		desc:        "no cib",
+		xml:         `<notcib></notcib>`,
+		expectError: "invalid cib state: root element not found",
+	}}
+
+	for _, c := range cases {
+		listCommand = &crmCommand{"echo", []string{c.xml}}
+
+		actual, err := cib.GetNodeID("dewey")
+		if err != nil {
+			if err.Error() != c.expectError {
+				t.Errorf("Unexpected error in case '%s': %s", c.desc, err)
+				t.Errorf("Expected: %s", c.expectError)
+			}
+			continue
+		}
+
+		if c.expectError != "" {
+			t.Error("Expected error")
+			continue
+		}
+
+		if actual != c.expect {
+			t.Errorf("State does not match for case \"%s\"", c.desc)
+			t.Errorf("Expected: %+v", c.expect)
+			t.Errorf("Actual: %+v", actual)
+		}
+	}
+}

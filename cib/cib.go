@@ -152,6 +152,36 @@ func (c *CIB) GetStonithEnabled() (bool, error) {
 	return ret, nil
 }
 
+func (c *CIB) GetNodeID(uname string) (int, error) {
+	err := c.ReadConfiguration()
+	if err != nil {
+		return 0, fmt.Errorf("could not read configuration: %w", err)
+	}
+
+	root := c.Doc.FindElement("/cib")
+	if root == nil {
+		return 0, fmt.Errorf("invalid cib state: root element not found")
+	}
+
+	node, err := findNode(root, uname)
+	if err != nil {
+		return 0, fmt.Errorf("could not find node: %w", err)
+	}
+
+	nodeIDStr := node.SelectAttrValue("id", "")
+	if nodeIDStr == "" {
+		return 0, fmt.Errorf("node doesn't have id attribute")
+	}
+
+	nodeID, err := strconv.Atoi(nodeIDStr)
+	if err != nil {
+		return 0, fmt.Errorf("could not convert node ID '%s' to number: %w",
+			nodeIDStr, err)
+	}
+
+	return nodeID, nil
+}
+
 func (c *CIB) SetClusterName(value string) error {
 	return c.setClusterProperty(ClusterName, value)
 }
