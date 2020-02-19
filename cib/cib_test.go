@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rsto/xmltest"
 	log "github.com/sirupsen/logrus"
 )
@@ -955,6 +956,108 @@ func TestMarshalLrmRunState(t *testing.T) {
 		t.Errorf("Unexpected marshalled JSON")
 		t.Errorf("Expected: %s", expect)
 		t.Errorf("Actual: %s", actual)
+	}
+}
+
+func TestListNodes(t *testing.T) {
+	var cib CIB
+
+	cases := []struct {
+		desc        string
+		xml         string
+		expect      []Node
+		expectError bool
+	}{{
+		desc: "one node",
+		xml: `<cib><status>
+			<node_state uname="node1" in_ccm="true" crmd="online" join="member" expected="member" />
+		</status></cib>`,
+		expect: []Node{{
+			HostName: "node1",
+			State: NodeState{
+				InCCM:        true,
+				Crmd:         true,
+				Join:         JoinMember,
+				JoinExpected: JoinMember,
+			},
+		}},
+	}, {
+		desc: "multiple nodes",
+		xml: `<cib><status>
+			<node_state uname="node1" in_ccm="true" crmd="online" join="member" expected="down" />
+			<node_state uname="node2" in_ccm="true" crmd="online" join="down" expected="member" />
+			<node_state uname="node3" in_ccm="true" crmd="offline" join="member" expected="member" />
+			<node_state uname="node4" in_ccm="false" crmd="online" join="member" expected="member" />
+			<node_state uname="node5" in_ccm="false" crmd="offline" join="pending" expected="banned" />
+		</status></cib>`,
+		expect: []Node{{
+			HostName: "node1",
+			State:    NodeState{InCCM: true, Crmd: true, Join: JoinMember, JoinExpected: JoinDown},
+		}, {
+			HostName: "node2",
+			State:    NodeState{InCCM: true, Crmd: true, Join: JoinDown, JoinExpected: JoinMember},
+		}, {
+			HostName: "node3",
+			State:    NodeState{InCCM: true, Crmd: false, Join: JoinMember, JoinExpected: JoinMember},
+		}, {
+			HostName: "node4",
+			State:    NodeState{InCCM: false, Crmd: true, Join: JoinMember, JoinExpected: JoinMember},
+		}, {
+			HostName: "node5",
+			State:    NodeState{InCCM: false, Crmd: false, Join: JoinPending, JoinExpected: JoinBanned},
+		}},
+	}, {
+		desc: "no uname",
+		xml: `<cib><status>
+			<node_state in_ccm="true" crmd="online" join="member" expected="member" />
+		</status></cib>`,
+		expectError: true,
+	}, {
+		desc: "no in_ccm",
+		xml: `<cib><status>
+			<node_state uname="node1" crmd="online" join="member" expected="member" />
+		</status></cib>`,
+		expectError: true,
+	}, {
+		desc: "no crmd",
+		xml: `<cib><status>
+			<node_state in_ccm="true" uname="node1" join="member" expected="member" />
+		</status></cib>`,
+		expectError: true,
+	}, {
+		desc: "no join",
+		xml: `<cib><status>
+			<node_state in_ccm="true" uname="node1" crmd="online" expected="member" />
+		</status></cib>`,
+		expectError: true,
+	}, {
+		desc: "no expected",
+		xml: `<cib><status>
+			<node_state in_ccm="true" uname="node1" crmd="online" join="member" />
+		</status></cib>`,
+		expectError: true,
+	}}
+
+	for _, c := range cases {
+		listCommand = &crmCommand{"echo", []string{c.xml}}
+		actual, err := cib.ListNodes()
+		if err != nil {
+			if !c.expectError {
+				t.Errorf("Unexpected error in case '%s': %s", c.desc, err)
+			}
+			continue
+		}
+
+		if c.expectError {
+			t.Error("Expected error")
+			continue
+		}
+
+		if !cmp.Equal(actual, c.expect) {
+			t.Errorf("State does not match for case \"%s\"", c.desc)
+			t.Errorf("Expected: %+v", c.expect)
+			t.Errorf("Actual: %+v", actual)
+		}
 	}
 }
 
