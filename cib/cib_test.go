@@ -1164,3 +1164,88 @@ func TestGetNodeID(t *testing.T) {
 		}
 	}
 }
+
+func TestListResourcesOnNode(t *testing.T) {
+	var cib CIB
+
+	cases := []struct {
+		desc   string
+		xml    string
+		expect []string
+	}{{
+		desc: "one node, one running resource",
+		xml: `<cib><status><node_state uname="node1"><lrm>
+			<lrm_resources>
+				<lrm_resource id="p_test">
+					<lrm_rsc_op operation="monitor" rc-code="0" />
+				</lrm_resource>
+			</lrm_resources>
+		</lrm></node_state></status></cib>`,
+		expect: []string{"p_test"},
+	}, {
+		desc: "multiple resources, only one running",
+		xml: `<cib><status>
+			<node_state uname="node1"><lrm>
+				<lrm_resources>
+					<lrm_resource id="p_test1">
+						<lrm_rsc_op operation="start" rc-code="0" />
+					</lrm_resource>
+					<lrm_resource id="p_test2">
+						<lrm_rsc_op operation="stop" rc-code="0" />
+					</lrm_resource>
+					<lrm_resource id="p_test3">
+						<lrm_rsc_op operation="monitor" rc-code="7" />
+					</lrm_resource>
+				</lrm_resources>
+			</lrm></node_state>
+			<node_state uname="node2"><lrm>
+				<lrm_resources>
+					<lrm_resource id="p_test">
+						<lrm_rsc_op operation="monitor" rc-code="7" />
+					</lrm_resource>
+				</lrm_resources>
+			</lrm></node_state>
+			<node_state uname="node3"><lrm>
+				<lrm_resources>
+				</lrm_resources>
+			</lrm></node_state>
+		</status></cib>`,
+		expect: []string{"p_test1"},
+	}, {
+		desc: "multiple resources, multiple running",
+		xml: `<cib><status>
+			<node_state uname="node1"><lrm>
+				<lrm_resources>
+					<lrm_resource id="p_test1">
+						<lrm_rsc_op operation="start" rc-code="0" />
+					</lrm_resource>
+					<lrm_resource id="p_test2">
+						<lrm_rsc_op operation="monitor" rc-code="0" />
+					</lrm_resource>
+					<lrm_resource id="p_test3">
+						<lrm_rsc_op operation="stop" rc-code="7" />
+					</lrm_resource>
+				</lrm_resources>
+			</lrm></node_state>
+		</status></cib>`,
+		expect: []string{"p_test1", "p_test2", "p_test3"},
+	}}
+
+	for _, c := range cases {
+		listCommand = &crmCommand{"echo", []string{c.xml}}
+		err := cib.ReadConfiguration()
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual, err := cib.ListResourcesOnNode("node1")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !cmp.Equal(actual, c.expect) {
+			t.Errorf("State does not match for case \"%s\"", c.desc)
+			t.Errorf("Expected: %+v", c.expect)
+			t.Errorf("Actual: %+v", actual)
+		}
+	}
+}

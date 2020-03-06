@@ -347,6 +347,35 @@ func findNode(root *xmltree.Element, nodeUname string) (*xmltree.Element, error)
 	return node, nil
 }
 
+// ListResourcesOnNode lists all resources currently running on the given node
+func (c *CIB) ListResourcesOnNode(node string) ([]string, error) {
+	if c.Doc == nil {
+		err := c.ReadConfiguration()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read configuration: %w", err)
+		}
+	}
+	elems := c.Doc.FindElements("/cib/status/node_state[@uname='" + node + "']/lrm/lrm_resources/lrm_resource")
+
+	var running []string
+	for i := range elems {
+		elem := elems[i]
+		id := elem.SelectAttrValue("id", "")
+		if id == "" {
+			// lrm-resource without id? weird... ignore it
+			log.Debugf("ListResourcesOnNode: skipping resource without id")
+			continue
+		}
+
+		state := updateRunState(id, elem, Unknown)
+		if state == Running {
+			running = append(running, id)
+		}
+	}
+
+	return running, nil
+}
+
 // IsStandbyNode check if a node is currently set standby
 func (c *CIB) IsStandbyNode(nodeUname string) (bool, error) {
 	err := c.ReadConfiguration()
