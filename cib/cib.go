@@ -766,9 +766,13 @@ func (c *CIB) DissolveConstraints(delItems []string) {
 		// colocation references (if we had a better xpath library we could do this at once...)
 		`configuration/constraints/rsc_colocation[@rsc='%s']`,
 		`configuration/constraints/rsc_colocation[@with-rsc='%s']`,
+		// colocation constraints with resource sets
+		`configuration/constraints/rsc_colocation/resource_set/resource_ref[@id='%s']/../../`,
 		// order references
 		`configuration/constraints/rsc_order[@first='%s']`,
 		`configuration/constraints/rsc_order[@then='%s']`,
+		// order constraints with resource sets
+		`configuration/constraints/rsc_order/resource_set/resource_ref[@id='%s']/../../`,
 		// rsc_location -> resource_ref references
 		`configuration/constraints/rsc_location/resource_set/resource_ref[@id='%s']/../..`,
 		// rsc_location with direct rsc
