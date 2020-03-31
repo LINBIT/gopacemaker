@@ -902,7 +902,7 @@ func TestReadConfiguration(t *testing.T) {
 	// Test that a failed cibadmin command leads to ErrCibFailed
 	listCommand = &testCommand{
 		func(_ string) (string, string, error) {
-			return "", "", errors.New("oops!")
+			return "", "", errors.New("oops")
 		},
 	}
 
