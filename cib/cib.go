@@ -467,7 +467,9 @@ func (c *CIB) UnStandbyNode(nodeUname string) error {
 
 	if instanceAttrElem != nil {
 		standbyNVPair := instanceAttrElem.FindElement("nvpair[@name='standby']")
-		instanceAttrElem.RemoveChild(standbyNVPair)
+		if standbyNVPair != nil {
+			instanceAttrElem.RemoveChild(standbyNVPair)
+		}
 	}
 	// else no standby set, we are good
 

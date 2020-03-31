@@ -804,7 +804,42 @@ func TestNodeUnStandby(t *testing.T) {
 			<node id="3" uname="la2"/>
 			<node id="2" uname="la3"/>
 		</nodes></configuration></cib>`,
-	}}
+	},
+		{
+			desc: "unstandby la1",
+			input: `<cib><configuration><crm_config>
+			<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+			<nvpair id="cib-bootstrap-options-have-watchdog" name="have-watchdog" value="false"/>
+			<nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="2.0.2.linbit-3.0.el8-744a30d655"/>
+			<nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			</cluster_property_set>
+		</crm_config>
+		<nodes>
+			<node id="1" uname="la1">
+				<instance_attributes id="nodes-1"/>
+			</node>
+			<node id="3" uname="la2"/>
+			<node id="2" uname="la3"/>
+		</nodes></configuration></cib>`,
+			expect: `<cib><configuration><crm_config>
+		<cluster_property_set id="cib-bootstrap-options">
+			<nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="false"/>
+			<nvpair id="cib-bootstrap-options-have-watchdog" name="have-watchdog" value="false"/>
+			<nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="2.0.2.linbit-3.0.el8-744a30d655"/>
+			<nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+			<nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="la"/>
+			</cluster_property_set>
+		</crm_config>
+		<nodes>
+			<node id="1" uname="la1">
+				<instance_attributes id="nodes-1"/>
+			</node>
+			<node id="3" uname="la2"/>
+			<node id="2" uname="la3"/>
+		</nodes></configuration></cib>`,
+		}}
 
 	for _, c := range cases {
 		var cib CIB
